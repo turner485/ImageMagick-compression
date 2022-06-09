@@ -1,0 +1,59 @@
+#!/bin/bash
+
+# source config file
+source $(dirname "$0")/repo-config
+# read user input path
+read -p "Enter root folder path: " file_path
+echo "" # used to reset indent of next line
+
+# if 'images' folder isn't found, exit script
+if [ ! -d "${file_path}"/images ]; then
+    printf "Couldn't find 'images' folder\nExiting script\n"
+    exit 1
+fi
+
+# if 'compressed-images' folder is found, exit script
+if [ -d "${file_path}/images/compressed-images" ]; then
+    printf "Found 'images/compressed-images' folder\nEnsure that folder doesn't exist before trying again\nExiting script\n"
+    exit 2
+fi
+
+# change directory and create "compressed-images" folder
+cd "${file_path}"/images
+mkdir compressed-images
+
+# run magick compression for jpg
+for f in *.jpg; do
+    echo "Compressing {$f}" 
+    $magick $f -set filename:base "%[basename]" -sampling-factor 4:2:0 -strip -quality 85% -interlace JPEG -colorspace RGB "compressed-images/%[filename:base].jpg"
+done
+
+echo "" # used for formatting
+
+# move all jpg files found inside 'compressed-images' folder to current directory
+mv compressed-images/*.jpg .
+
+# if 'compressed-images' folder is empty then delete - otherwise ignore
+if [ -z "$(ls -A compressed-images)" ]; then
+    rm -rf compressed-images
+else
+    printf "File(s) found in 'compressed-images' folder therefore will not delete folder\n\n"
+fi
+
+# check config for webp preference
+if [[ "$ask_webp" == "true" ]]; then
+    # ask user if webp is needed
+    read -p "Convert webp images? Y/N" convert_webp
+    echo "" # used to reset indent of next line
+
+    # if yes, run magick conversion for webp
+    if [[ $convert_webp == "Y" || $convert_webp == "y" ]]; then
+        for f in *.jpg; do
+            echo "Converting {$f} to .webp file"
+            $magick $f -set filename:base "%[basename]" -quality 80 -strip -define webp:lossless=false -define webp:method=6 "%[filename:base]_webp.webp"
+        done
+        echo "" # used for formatting
+    fi
+fi
+
+printf "Finished compression\n"
